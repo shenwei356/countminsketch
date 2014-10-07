@@ -126,7 +126,7 @@ Benchmark
 
 Documentation
 -------------
-[See documentation on gowalker for more detail](http://gowalker.org/github.com/shenwei356/countminsketch/)
+[See documentation on gowalker for more detail](http://gowalker.org/github.com/shenwei356/countminsketch)
 
 Reference 
 -------------
