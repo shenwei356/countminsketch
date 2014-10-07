@@ -22,34 +22,36 @@ import (
 )
 
 // CountMinSketch struct. d is the number of hashing functions,
-// The hash function maps items uniformly onto the range {1, 2, . . . w}
-// count store the count data. slice, instead of matrix, is used
-// for convenience in serialization operation.
+// w is the size of every hash table.
+// count, a matrix, is used to store the count.
+// uint is used to store count, the maximum count is 1<<32-1 in
+// 32 bit OS, and 1<<64-1 in 64 bit OS.
 type CountMinSketch struct {
 	d      uint
 	w      uint
-	count  []uint
+	count  [][]uint
 	hasher hash.Hash64
 }
 
 // Create a new Count-Min Sketch with _d_ hashing functions
 // and _w_ hash value range
 func New(d uint, w uint) (s *CountMinSketch, err error) {
-	// the cap of slice is int, int32 exacly.
-	if int32(d*w) < 0 || int32(d*w) > int32(^uint32(0)>>1) {
-		return nil, fmt.Errorf("d*w (%d) too large, out of range", d*w)
-	}
-
-	// assumming you have a 2G RAM, the cap of slice should < (2<<30) / 4
-	if int32(d*w) > 536870912 {
-		return nil, fmt.Errorf("d*w (%d) too large, it would be out of memory", d*w)
-	}
 	s = &CountMinSketch{
 		d:      d,
 		w:      w,
-		count:  make([]uint, int32(d*w)),
 		hasher: fnv.New64(),
 	}
+
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("%v", e)
+		}
+	}()
+	s.count = make([][]uint, s.d)
+	for r := uint(0); r < s.d; r++ {
+		s.count[r] = make([]uint, w)
+	}
+
 	return s, err
 }
 
@@ -63,6 +65,7 @@ func NewWithEstimates(varepsilon, delta float64) (*CountMinSketch, error) {
 	}
 	w := uint(math.Ceil(2 / varepsilon))
 	d := uint(math.Ceil(math.Log(1-delta) / math.Log(0.5)))
+	// fmt.Printf("ε: %f, δ: %f -> d: %d, w: %d\n", varepsilon, delta, d, w)
 	return New(d, w)
 }
 
@@ -115,7 +118,7 @@ func (s *CountMinSketch) locations(key []byte) (locs []uint) {
 // Update the frequency of a key
 func (s *CountMinSketch) Update(key []byte, count uint) {
 	for r, c := range s.locations(key) {
-		s.count[uint(r)*s.w+c] += count
+		s.count[r][c] += count
 	}
 }
 
@@ -128,8 +131,8 @@ func (s *CountMinSketch) UpdateString(key string, count uint) {
 func (s *CountMinSketch) Estimate(key []byte) uint {
 	var min uint
 	for r, c := range s.locations(key) {
-		if r == 0 || s.count[uint(r)*s.w+c] < min {
-			min = s.count[uint(r)*s.w+c]
+		if r == 0 || s.count[r][c] < min {
+			min = s.count[r][c]
 		}
 	}
 	return min
@@ -142,9 +145,9 @@ func (s *CountMinSketch) EstimateString(key string) uint {
 
 // JSON struct for marshal and unmarshal
 type countMinSketchJSON struct {
-	D     uint   `json:"d"`
-	W     uint   `json:"w"`
-	Count []uint `json:"count"`
+	D     uint     `json:"d"`
+	W     uint     `json:"w"`
+	Count [][]uint `json:"count"`
 }
 
 // MarshalJSON implements json.Marshaler interface.
@@ -180,15 +183,17 @@ func (s *CountMinSketch) WriteTo(stream io.Writer) (int64, error) {
 		return 0, err
 	}
 
-	C := make([]uint64, s.d*s.w)
-	for i := uint(0); i < s.d*s.w; i++ {
-		C[i] = uint64(s.count[i])
+	C := make([]uint64, s.w)
+	for r := uint(0); r < s.d; r++ {
+		for c := uint(0); c < s.w; c++ {
+			C[c] = uint64(s.count[r][c])
+		}
+		err = binary.Write(stream, binary.BigEndian, C)
+		if err != nil {
+			return 0, err
+		}
 	}
-	err = binary.Write(stream, binary.BigEndian, C)
-	if err != nil {
-		return 0, err
-	}
-	return int64(2*binary.Size(uint64(0)) + binary.Size(C)), err
+	return int64(2*binary.Size(uint64(0)) + int(s.d)*binary.Size(C)), err
 }
 
 // ReadFrom a binary representation of the CountMinSketch from an i/o stream.
@@ -205,19 +210,29 @@ func (s *CountMinSketch) ReadFrom(stream io.Reader) (int64, error) {
 	}
 	s.d = uint(d)
 	s.w = uint(w)
-	s.count = make([]uint, s.d*s.w)
 
-	C := make([]uint64, s.d*s.w)
-	err = binary.Read(stream, binary.BigEndian, &C)
-	if err != nil {
-		return 0, err
-	}
-	for i := uint(0); i < s.d*s.w; i++ {
-		s.count[i] = uint(C[i])
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("%v", e)
+		}
+	}()
+	s.count = make([][]uint, s.d)
+	for r := uint(0); r < s.d; r++ {
+		s.count[r] = make([]uint, w)
 	}
 
+	C := make([]uint64, s.w)
+	for r := uint(0); r < s.d; r++ {
+		err = binary.Read(stream, binary.BigEndian, &C)
+		if err != nil {
+			return 0, err
+		}
+		for c := uint(0); c < s.w; c++ {
+			s.count[r][c] = uint(C[c])
+		}
+	}
 	s.hasher = fnv.New64()
-	return int64(2*binary.Size(uint64(0)) + binary.Size(C)), nil
+	return int64(2*binary.Size(uint64(0)) + int(s.d)*binary.Size(C)), nil
 }
 
 // Write the Count-Min Sketch to file

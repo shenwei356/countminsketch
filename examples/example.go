@@ -24,6 +24,7 @@ func main() {
 	fmt.Printf("%s:%d\n\n", key, s.EstimateString(key))
 
 	//////////////////////////////////////////////////
+
 	file := "data"
 	s.UpdateString(key, 2)
 	_, err = s.WriteToFile(file)
@@ -38,6 +39,7 @@ func main() {
 	fmt.Printf("%s:%d\n", key, cm.EstimateString(key))
 
 	//////////////////////////////////////////////////
+
 	s, err = countminsketch.NewWithEstimates(0.1, 0.9)
 	checkerr(err)
 	s.UpdateString(key, 10)
