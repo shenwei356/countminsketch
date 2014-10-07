@@ -58,12 +58,12 @@ Install
 
 This package is "go-gettable", just:
 
-    go get github.com/shenwei356/countmin
+    go get github.com/shenwei356/countminsketch
 
 Usage
 -------------
 
-    import "github.com/shenwei356/countmin"
+    import "github.com/shenwei356/countminsketch"
 
 	var varepsilon, delta float64
 	varepsilon, delta = 0.1, 0.9
