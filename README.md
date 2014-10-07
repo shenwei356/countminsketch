@@ -53,6 +53,13 @@ only one basic hashing step is computed. So the parallelization is not necessary
 
 We could make it thread safe by using a operation backend, similar to [pmap](https://github.com/shenwei356/pmap).
 
+Install
+-------
+
+This package is "go-gettable", just:
+
+    go get github.com/shenwei356/countmin
+
 Usage
 -------------
 
@@ -119,7 +126,7 @@ Benchmark
 
 Documentation
 -------------
-[See documentation on gowalker for more detail](http://gowalker.org/github.com/shenwei356/countmin/)
+[See documentation on gowalker for more detail](http://gowalker.org/github.com/shenwei356/countminsketch/)
 
 Reference 
 -------------
