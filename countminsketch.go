@@ -1,12 +1,10 @@
-/*
-countmin - An implementation of Count-Min Sketch in Golang.
+/*Package countminsketch is an implementation of Count-Min Sketch in Golang.
 
 http://github.com/shenwei356/countmin/
 
 The code is deeply inspired by an implementation of Bloom filters in golang,
 [bloom](https://github.com/willf/bloom).
 */
-
 package countminsketch
 
 import (
@@ -29,69 +27,74 @@ import (
 type CountMinSketch struct {
 	d      uint
 	w      uint
-	count  [][]uint
+	count  [][]uint64
 	hasher hash.Hash64
 }
 
-// Create a new Count-Min Sketch with _d_ hashing functions
+// New creates a new Count-Min Sketch with _d_ hashing functions
 // and _w_ hash value range
 func New(d uint, w uint) (s *CountMinSketch, err error) {
+	if d <= 0 || w <= 0 {
+		return nil, fmt.Errorf("countminsketch: values of d and w should both be greater than 0")
+	}
+
 	s = &CountMinSketch{
 		d:      d,
 		w:      w,
 		hasher: fnv.New64(),
 	}
-
-	defer func() {
-		if e := recover(); e != nil {
-			err = fmt.Errorf("%v", e)
-		}
-	}()
-	s.count = make([][]uint, s.d)
-	for r := uint(0); r < s.d; r++ {
-		s.count[r] = make([]uint, w)
+	s.count = make([][]uint64, d)
+	for r := uint(0); r < d; r++ {
+		s.count[r] = make([]uint64, w)
 	}
 
-	return s, err
+	return s, nil
 }
 
-// Create a new Count-Min Sketch with given error rate and confidence.
+// NewWithEstimates creates a new Count-Min Sketch with given error rate and confidence.
 // Accuracy guarantees will be made in terms of a pair of user specified parameters,
 // ε and δ, meaning that the error in answering a query is within a factor of ε with
 // probability δ
-func NewWithEstimates(varepsilon, delta float64) (*CountMinSketch, error) {
-	if delta >= 1.0 {
-		delta = 0.9999
+func NewWithEstimates(epsilon, delta float64) (*CountMinSketch, error) {
+	if epsilon <= 0 || epsilon >= 1 {
+		return nil, fmt.Errorf("countminsketch: value of epsilon should be in range of (0, 1)")
 	}
-	w := uint(math.Ceil(2 / varepsilon))
+	if delta <= 0 || delta >= 1 {
+		return nil, fmt.Errorf("countminsketch: value of delta should be in range of (0, 1)")
+	}
+
+	w := uint(math.Ceil(2 / epsilon))
 	d := uint(math.Ceil(math.Log(1-delta) / math.Log(0.5)))
-	// fmt.Printf("ε: %f, δ: %f -> d: %d, w: %d\n", varepsilon, delta, d, w)
+	// fmt.Printf("ε: %f, δ: %f -> d: %d, w: %d\n", epsilon, delta, d, w)
 	return New(d, w)
 }
 
-// Create a new Count-Min Sketch from dumpped file
+// NewFromFile creates a new Count-Min Sketch from dumpped file
 func NewFromFile(file string) (*CountMinSketch, error) {
-	s, _ := New(0, 0)
-	_, err := s.ReadFromFile(file)
+	s, err := New(1, 1)
+	if err != nil {
+		return nil, err
+	}
+	_, err = s.ReadFromFile(file)
 	if err != nil {
 		return nil, err
 	}
 	return s, nil
 }
 
-// Return the number of hashing functions
+// D returns the number of hashing functions
 func (s *CountMinSketch) D() uint {
 	return s.d
 }
 
-// Return the w
+// W returns the size of hashing functions
 func (s *CountMinSketch) W() uint {
 	return s.w
 }
 
 // get the two basic hash function values for data.
 // Based on https://github.com/willf/bloom/blob/master/bloom.go
-func (s *CountMinSketch) base_hashes(key []byte) (a uint32, b uint32) {
+func (s *CountMinSketch) baseHashes(key []byte) (a uint32, b uint32) {
 	s.hasher.Reset()
 	s.hasher.Write(key)
 	sum := s.hasher.Sum(nil)
@@ -106,7 +109,7 @@ func (s *CountMinSketch) base_hashes(key []byte) (a uint32, b uint32) {
 // Based on https://github.com/willf/bloom/blob/master/bloom.go
 func (s *CountMinSketch) locations(key []byte) (locs []uint) {
 	locs = make([]uint, s.d)
-	a, b := s.base_hashes(key)
+	a, b := s.baseHashes(key)
 	ua := uint(a)
 	ub := uint(b)
 	for r := uint(0); r < s.d; r++ {
@@ -116,20 +119,20 @@ func (s *CountMinSketch) locations(key []byte) (locs []uint) {
 }
 
 // Update the frequency of a key
-func (s *CountMinSketch) Update(key []byte, count uint) {
+func (s *CountMinSketch) Update(key []byte, count uint64) {
 	for r, c := range s.locations(key) {
 		s.count[r][c] += count
 	}
 }
 
-// Update the frequency of a key
-func (s *CountMinSketch) UpdateString(key string, count uint) {
+// UpdateString updates the frequency of a key
+func (s *CountMinSketch) UpdateString(key string, count uint64) {
 	s.Update([]byte(key), count)
 }
 
 // Estimate the frequency of a key. It is point query.
-func (s *CountMinSketch) Estimate(key []byte) uint {
-	var min uint
+func (s *CountMinSketch) Estimate(key []byte) uint64 {
+	var min uint64
 	for r, c := range s.locations(key) {
 		if r == 0 || s.count[r][c] < min {
 			min = s.count[r][c]
@@ -138,28 +141,28 @@ func (s *CountMinSketch) Estimate(key []byte) uint {
 	return min
 }
 
-// Estimate the frequency of a key
-func (s *CountMinSketch) EstimateString(key string) uint {
+// EstimateString estimate the frequency of a key of string
+func (s *CountMinSketch) EstimateString(key string) uint64 {
 	return s.Estimate([]byte(key))
 }
 
-// JSON struct for marshal and unmarshal
-type countMinSketchJSON struct {
-	D     uint     `json:"d"`
-	W     uint     `json:"w"`
-	Count [][]uint `json:"count"`
+// CountMinSketchJSON is the JSON struct of CountMinSketch for marshal and unmarshal
+type CountMinSketchJSON struct {
+	D     uint       `json:"d"`
+	W     uint       `json:"w"`
+	Count [][]uint64 `json:"count"`
 }
 
 // MarshalJSON implements json.Marshaler interface.
 // Based on https://github.com/willf/bloom/blob/master/bloom.go
 func (s *CountMinSketch) MarshalJSON() ([]byte, error) {
-	return json.Marshal(countMinSketchJSON{s.d, s.w, s.count})
+	return json.Marshal(CountMinSketchJSON{s.d, s.w, s.count})
 }
 
 // UnmarshalJSON implements json.Unmarshaler interface.
 // Based on https://github.com/willf/bloom/blob/master/bloom.go
 func (s *CountMinSketch) UnmarshalJSON(data []byte) error {
-	var j countMinSketchJSON
+	var j CountMinSketchJSON
 	err := json.Unmarshal(data, &j)
 	if err != nil {
 		return err
@@ -186,7 +189,7 @@ func (s *CountMinSketch) WriteTo(stream io.Writer) (int64, error) {
 	C := make([]uint64, s.w)
 	for r := uint(0); r < s.d; r++ {
 		for c := uint(0); c < s.w; c++ {
-			C[c] = uint64(s.count[r][c])
+			C[c] = s.count[r][c]
 		}
 		err = binary.Write(stream, binary.BigEndian, C)
 		if err != nil {
@@ -211,14 +214,9 @@ func (s *CountMinSketch) ReadFrom(stream io.Reader) (int64, error) {
 	s.d = uint(d)
 	s.w = uint(w)
 
-	defer func() {
-		if e := recover(); e != nil {
-			err = fmt.Errorf("%v", e)
-		}
-	}()
-	s.count = make([][]uint, s.d)
+	s.count = make([][]uint64, s.d)
 	for r := uint(0); r < s.d; r++ {
-		s.count[r] = make([]uint, w)
+		s.count[r] = make([]uint64, w)
 	}
 
 	C := make([]uint64, s.w)
@@ -228,14 +226,14 @@ func (s *CountMinSketch) ReadFrom(stream io.Reader) (int64, error) {
 			return 0, err
 		}
 		for c := uint(0); c < s.w; c++ {
-			s.count[r][c] = uint(C[c])
+			s.count[r][c] = C[c]
 		}
 	}
 	s.hasher = fnv.New64()
 	return int64(2*binary.Size(uint64(0)) + int(s.d)*binary.Size(C)), nil
 }
 
-// Write the Count-Min Sketch to file
+// WriteToFile writes the Count-Min Sketch to file
 func (s *CountMinSketch) WriteToFile(file string) (int64, error) {
 	fh, err := os.Create(file)
 	defer fh.Close()
@@ -249,13 +247,14 @@ func (s *CountMinSketch) WriteToFile(file string) (int64, error) {
 	return size, nil
 }
 
-// Read Count-Min Sketch from file
+// ReadFromFile reads Count-Min Sketch from file
 func (s *CountMinSketch) ReadFromFile(file string) (int64, error) {
 	fh, err := os.Open(file)
-	defer fh.Close()
 	if err != nil {
 		return 0, err
 	}
+	defer fh.Close()
+
 	size, err := s.ReadFrom(fh)
 	if err != nil {
 		return 0, err

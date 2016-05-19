@@ -15,12 +15,12 @@ Introduction of Count-Min Sketch, from Wikipedia[1]
 >    represent multisets and frequency tables. Spectral Bloom filters with
 >    multi-set policy, are conceptually isomorphic to the Count-Min Sketch.
 
-The code is deeply inspired by an implementation of Bloom filters in golang, 
+The code is deeply inspired by an implementation of Bloom filters in golang,
 [bloom](https://github.com/willf/bloom).
 
-Same to bloom, the hashing function used is FNV, provided by Go package 
-(hash/fnv). For a item, the 64-bit FNV hash is computed, and upper and lower 
-32 bit numbers, call them _h1_ and _h2_, are used. Then, the _i_ th hashing 
+Same to bloom, the hashing function used is FNV, provided by Go package
+(hash/fnv). For a item, the 64-bit FNV hash is computed, and upper and lower
+32 bit numbers, call them _h1_ and _h2_, are used. Then, the _i_ th hashing
 function is:
 
     h1 + h2*i
@@ -32,14 +32,14 @@ Accuracy guarantees will be made in terms of a pair of user specified parameters
 ε and δ, meaning that the error in answering a query is within a factor of ε with
  probability δ[2]
 
-For a sketch of size _w_ × _d_ with total count _N_ , it follows that any 
-estimate has error at most _2N/w_, with probability at least 1 - (1/2)^_d_. 
-So setting the parameters _w_ and _d_ large enough allows us to achieve 
+For a sketch of size _w_ × _d_ with total count _N_ , it follows that any
+estimate has error at most _2N/w_, with probability at least 1 - (1/2)^_d_.
+So setting the parameters _w_ and _d_ large enough allows us to achieve
 very high accuracy while using relatively little space[3].
 
-Suppose we want an error of at most 0.1% (of the sum of all frequencies), 
-with 99.9% certainty. Then we want 2/_w_ = 1/1000, we set _w_ = 2000, 
-and = 0.001, i.e. _d_ = log 0.001 / log 0.5 ≤ 10. Using uint counters, 
+Suppose we want an error of at most 0.1% (of the sum of all frequencies),
+with 99.9% certainty. Then we want 2/_w_ = 1/1000, we set _w_ = 2000,
+and = 0.001, i.e. _d_ = log 0.001 / log 0.5 ≤ 10. Using uint counters,
 the space required by the array of counters is _w_ × _d_ × 4 = 80KB in 32 bit
 OS, and _w_ × _d_ × 8 = 160KB in 64 bit OS [3].
 
@@ -49,7 +49,7 @@ Parallelization
 -----------
 
 The parallelizing part of Count-Min Sketch is the hashing step. But in this implementation,
-only one basic hashing step is computed. So the parallelization is not necessary. 
+only one basic hashing step is computed. So the parallelization is not necessary.
 
 We could make it thread safe by using a operation backend, similar to [pmap](https://github.com/shenwei356/pmap).
 
@@ -65,14 +65,14 @@ Usage
 
     import "github.com/shenwei356/countminsketch"
 
-	var varepsilon, delta float64
-	varepsilon, delta = 0.1, 0.9
-	s := countminsketch.NewWithEstimates(varepsilon, delta)
-	fmt.Printf("ε: %f, δ: %f -> d: %d, w: %d\n", varepsilon, delta, s.D(), s.W())
+	var epsilon, delta float64
+	epsilon, delta = 0.1, 0.9
+	s := countminsketch.NewWithEstimates(epsilon, delta)
+	fmt.Printf("ε: %f, δ: %f -> d: %d, w: %d\n", epsilon, delta, s.D(), s.W())
 
-	varepsilon, delta = 0.0001, 0.9999
-	s = countminsketch.NewWithEstimates(varepsilon, delta)
-	fmt.Printf("ε: %f, δ: %f -> d: %d, w: %d\n", varepsilon, delta, s.D(), s.W())
+	epsilon, delta = 0.0001, 0.9999
+	s = countminsketch.NewWithEstimates(epsilon, delta)
+	fmt.Printf("ε: %f, δ: %f -> d: %d, w: %d\n", epsilon, delta, s.D(), s.W())
 
 	key := "abc"
 	s.UpdateString(key, 1)
@@ -91,7 +91,7 @@ Usage
 	checkerr(err)
 
 	fmt.Printf("%s:%d\n", key, cm.EstimateString(key))
-	
+
     //////////////////////////////////////////////////
 	s = countminsketch.NewWithEstimates(0.1, 0.9)
 	s.UpdateString(key, 10)
@@ -104,17 +104,17 @@ Usage
 	s.UpdateString(key, 10)
 
 	fmt.Printf("%s:%d\n", key, s.EstimateString(key))
-	
+
 Output
 
     ε: 0.100000, δ: 0.900000 -> d: 4, w: 20
     ε: 0.000100, δ: 0.999900 -> d: 14, w: 20000
     abc:1
-    
+
     abc:3
     {"d":4,"w":20,"count":[[0,0,0,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,0,0,0,0],[0,0,0,0,0,0,0,10,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10]]}
     abc:20
-    
+
 Benchmark
 --------
 
@@ -122,13 +122,14 @@ Benchmark
     Benchmark_Estimates_ε0_001_δ0_999        5000000               481 ns/op
     Benchmark_Update_ε0_000001_δ0_9999       2000000               941 ns/op
     Benchmark_Estimates_ε0_000001_δ0_9999    2000000               841 ns/op
-    
+
 
 Documentation
 -------------
-[See documentation on gowalker for more detail](http://gowalker.org/github.com/shenwei356/countminsketch)
 
-Reference 
+[![GoDoc](https://godoc.org/github.com/shenwei356/countminsketch?status.svg)](https://godoc.org/github.com/shenwei356/countminsketch)
+
+Reference
 -------------
 1. [Wikipedia](http://en.wikipedia.org/wiki/Count%E2%80%93min_sketch)
 2. [An Improved Data Stream Summary: The Count-Min Sketch and its Applications](http://www.cse.unsw.edu.au/~cs9314/07s1/lectures/Lin_CS9314_References/cm-latin.pdf)
@@ -139,6 +140,6 @@ Reference
 Copyright
 --------
 
-Copyright (c) 2014, Wei Shen (shenwei356@gmail.com)
+Copyright (c) 2014-2016, Wei Shen (shenwei356@gmail.com)
 
 [MIT License](https://github.com/shenwei356/countminsketch/blob/master/LICENSE)

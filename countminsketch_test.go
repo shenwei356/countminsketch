@@ -22,25 +22,25 @@ func TestAccuracy(t *testing.T) {
 
 	iterations := 5500
 	var diverged int
-	for i := 1; i < iterations; i += 1 {
-		v := uint(i % 50)
+	for i := 1; i < iterations; i++ {
+		v := uint64(i % 50)
 
 		s.UpdateString(strconv.Itoa(i), v)
 		vv := s.EstimateString(strconv.Itoa(i))
 		if vv > v {
-			diverged += 1
+			diverged++
 		}
 	}
 
 	var miss int
-	for i := 1; i < iterations; i += 1 {
-		vv := uint(i % 50)
+	for i := 1; i < iterations; i++ {
+		vv := uint64(i % 50)
 
 		v := s.EstimateString(strconv.Itoa(i))
 		assert.Equal(t, v >= v, true)
 		if v != vv {
 			log.Printf("real: %d, estimate: %d\n", vv, v)
-			miss += 1
+			miss++
 		}
 	}
 	log.Printf("missed %d of %d (%d diverged during adds)", miss, iterations, diverged)
@@ -53,9 +53,9 @@ func TestIO(t *testing.T) {
 	}
 
 	iterations := 5500
-	cache := make(map[int]uint, iterations)
-	for i := 1; i < iterations; i += 1 {
-		v := uint(i % 50)
+	cache := make(map[int]uint64, iterations)
+	for i := 1; i < iterations; i++ {
+		v := uint64(i % 50)
 		s.UpdateString(strconv.Itoa(i), v)
 
 		cache[i] = s.EstimateString(strconv.Itoa(i))
@@ -64,22 +64,23 @@ func TestIO(t *testing.T) {
 
 	file := "datafile"
 	_, err = s.WriteToFile(file)
+	if err != nil {
+		t.Error(err)
+	}
+
 	defer func() {
 		err := os.Remove(file)
 		if err != nil {
 			t.Error(err)
 		}
 	}()
-	if err != nil {
-		t.Error(err)
-	}
 
 	cm, err := NewFromFile(file)
 	if err != nil {
 		t.Error(err)
 	}
 
-	for i := 1; i < iterations; i += 1 {
+	for i := 1; i < iterations; i++ {
 		if cache[i] != cm.EstimateString(strconv.Itoa(i)) {
 			t.Error(err)
 		}
@@ -92,7 +93,7 @@ func Benchmark_Update_ε0_001_δ0_999(b *testing.B) {
 		b.Error(err)
 	}
 	for i := 0; i < b.N; i++ {
-		s.UpdateString(strconv.Itoa(int(rand.Int31())), uint(rand.Int31()))
+		s.UpdateString(strconv.Itoa(int(rand.Int31())), uint64(rand.Int63()))
 	}
 }
 
@@ -112,7 +113,7 @@ func Benchmark_Update_ε0_000001_δ0_9999(b *testing.B) {
 		b.Error(err)
 	}
 	for i := 0; i < b.N; i++ {
-		s.UpdateString(strconv.Itoa(int(rand.Int31())), uint(rand.Int31()))
+		s.UpdateString(strconv.Itoa(int(rand.Int31())), uint64(rand.Int63()))
 	}
 }
 
