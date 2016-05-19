@@ -11,7 +11,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"hash"
 	"hash/fnv"
 	"io"
@@ -35,7 +35,7 @@ type CountMinSketch struct {
 // and _w_ hash value range
 func New(d uint, w uint) (s *CountMinSketch, err error) {
 	if d <= 0 || w <= 0 {
-		return nil, fmt.Errorf("countminsketch: values of d and w should both be greater than 0")
+		return nil, errors.New("countminsketch: values of d and w should both be greater than 0")
 	}
 
 	s = &CountMinSketch{
@@ -57,10 +57,10 @@ func New(d uint, w uint) (s *CountMinSketch, err error) {
 // probability δ
 func NewWithEstimates(epsilon, delta float64) (*CountMinSketch, error) {
 	if epsilon <= 0 || epsilon >= 1 {
-		return nil, fmt.Errorf("countminsketch: value of epsilon should be in range of (0, 1)")
+		return nil, errors.New("countminsketch: value of epsilon should be in range of (0, 1)")
 	}
 	if delta <= 0 || delta >= 1 {
-		return nil, fmt.Errorf("countminsketch: value of delta should be in range of (0, 1)")
+		return nil, errors.New("countminsketch: value of delta should be in range of (0, 1)")
 	}
 
 	w := uint(math.Ceil(2 / epsilon))
@@ -144,6 +144,25 @@ func (s *CountMinSketch) Estimate(key []byte) uint64 {
 // EstimateString estimate the frequency of a key of string
 func (s *CountMinSketch) EstimateString(key string) uint64 {
 	return s.Estimate([]byte(key))
+}
+
+// Merge combines this CountMinSketch with another one
+func (s *CountMinSketch) Merge(other *CountMinSketch) error {
+	if s.d != other.d {
+		return errors.New("countminsketch: matrix depth must match")
+	}
+
+	if s.w != other.w {
+		return errors.New("countminsketch: matrix width must match")
+	}
+
+	for i := uint(0); i < s.d; i++ {
+		for j := uint(0); j < s.w; j++ {
+			s.count[i][j] += other.count[i][j]
+		}
+	}
+
+	return nil
 }
 
 // CountMinSketchJSON is the JSON struct of CountMinSketch for marshal and unmarshal

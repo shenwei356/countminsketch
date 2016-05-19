@@ -51,7 +51,7 @@ Parallelization
 The parallelizing part of Count-Min Sketch is the hashing step. But in this implementation,
 only one basic hashing step is computed. So the parallelization is not necessary.
 
-We could make it thread safe by using a operation backend, similar to [pmap](https://github.com/shenwei356/pmap).
+If you have to, try to split the data and count separately. And at last `Merge` them.
 
 Install
 -------
