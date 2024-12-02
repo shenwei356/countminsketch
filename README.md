@@ -62,9 +62,10 @@ This package is "go-gettable", just:
 
 Usage
 -------------
+```go
+import "github.com/shenwei356/countminsketch"
 
-    import "github.com/shenwei356/countminsketch"
-
+func main() {
 	var epsilon, delta float64
 	epsilon, delta = 0.1, 0.9
 	s := countminsketch.NewWithEstimates(epsilon, delta)
@@ -92,7 +93,7 @@ Usage
 
 	fmt.Printf("%s:%d\n", key, cm.EstimateString(key))
 
-    //////////////////////////////////////////////////
+	//////////////////////////////////////////////////
 	s = countminsketch.NewWithEstimates(0.1, 0.9)
 	s.UpdateString(key, 10)
 	bytes, err := s.MarshalJSON()
@@ -104,6 +105,8 @@ Usage
 	s.UpdateString(key, 10)
 
 	fmt.Printf("%s:%d\n", key, s.EstimateString(key))
+}
+```
 
 Output
 
